@@ -1,41 +1,40 @@
-import requests
-from bs4 import BeautifulSoup
+from math import sin, pi
+import matplotlib.pyplot as plt
+import numpy as np
 from selenium import webdriver
-from selenium.webdriver.common.action_chains import ActionChains
-import time
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+import time
 
-url = 'https://wkusno-polesno.ru/'
 
+url = 'https://povar.ru/'
 driver = webdriver.Chrome(executable_path="/Users/admin/Desktop/LidEmulator/chromedriver/chromedriver")
-driver.get(url=url)
 driver.maximize_window()
-
-elements = driver.find_elements(By.XPATH, './/*')
-for element in elements:
-    print('loading...')
-    try:
-        if str(element.text.lower().strip()) == 'реклама':
-
-            element.click()
-
-
-    except Exception as ex:
-        print(ex)
-
-
-# soup = BeautifulSoup(driver.page_source, 'lxml')
-# links = soup.find_all()
-# for link in links:
-#     if link.get_text().strip().lower() == 'реклама':
-#         soupik = BeautifulSoup(str(link), 'lxml')
-#         soupik.find_all()
-#         for s in soupik:
-#             print(s)
+driver.get(url=url)
 
 
 
+def benchmark(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        func(*args, **kwargs)
+        print(time.time() - start)
 
+    return wrapper
 
+@benchmark
+def perform(driver):
+    elements = driver.find_elements(By.XPATH, './/*')
+    for element in elements:
+        print('loading...')
+        try:
+            adv = str(element.text.lower().strip())
 
+            if adv == 'реклама':
+                print(element.text)
+                element.click()
+                break
+        except Exception as ex:
+            print(ex)
 
+perform(driver)

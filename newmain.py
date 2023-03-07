@@ -1,7 +1,6 @@
 # backend part
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from bs4 import BeautifulSoup
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
@@ -9,10 +8,11 @@ import time
 from fake_useragent import UserAgent
 import random
 import os
-import pickle
-import requests
 import gdown
 from datetime import datetime
+from file_exchange import gdrive_download, gdrive_upload, log_folder, gdrive_delete
+import numpy as np
+from math import pi
 
 # dividing input file to parameters and urls list
 def get_params(filename: str):
@@ -62,6 +62,7 @@ class Emulation():
         self.driver.get(url=self.url)
         self.driver.maximize_window()
 
+    # Imitation of user scrolling page
     def scroll(self):
         print('scrolling')
         time.sleep(1 + random.random())
@@ -69,16 +70,24 @@ class Emulation():
         move_height = 0
         sign = 1
         doc_height = self.driver.execute_script("return document.documentElement.scrollHeight - document.documentElement.clientHeight")
+
+        # scroll speed will be sinusoidal function
+        step_amount = 30
+        x = np.linspace(0, pi, step_amount)
+        y = np.sin(x)
+
         # scroll imitation
         while time.time() - start_time < self.scroll_time:
-            for j in range(random.randint(20, 100)):
-                move_height += (j/4) * sign
+            multiplier = random.randint(20, 60)
+            for j in range(step_amount):
+                move_height += round(multiplier * sign * y[j])
                 self.driver.execute_script(f"window.scrollTo(0, {move_height});")
                 time.sleep(random.random() / 20)
             if random.randint(1, 5) == 3:
+                multiplier = random.randint(20, 60)
                 time.sleep(1 + random.random())
-                for k in range(random.randint(10, 50)):
-                    move_height -= (k/4) * sign
+                for k in range(step_amount):
+                    move_height -= round(multiplier * sign * y[k])
                     self.driver.execute_script(f"window.scrollTo(0, {move_height});")
                     time.sleep(random.random() / 20)
 
@@ -101,6 +110,7 @@ class Emulation():
 
             time.sleep(sleep_time + random.random())
 
+    # imitation of user searching and follow a link
     def search(self):
         link = "https://www.bing.com/"
         self.driver.get(url=link)
@@ -118,6 +128,7 @@ class Emulation():
         first_link = self.driver.find_element(By.XPATH, '//a[@class="sh_favicon"]').get_attribute('href')
         self.driver.get(url=first_link)
 
+    # imitation of user following advertising link
     def adv(self):
         print('Reklama')
         elements = self.driver.find_elements(By.XPATH, './/*')
@@ -132,6 +143,7 @@ class Emulation():
             except Exception as ex:
                 print(ex)
 
+    # Imitation of user following random link on current website
     def transition(self):
         action_chain = ActionChains(self.driver)
         links = self.driver.find_elements(By.PARTIAL_LINK_TEXT, '')
@@ -152,6 +164,7 @@ class Emulation():
                     link_flag = False
                 print(f"Transition problem {len(links)}")
 
+    # Function that creates sequence of all actions on one website
     def emulation(self):
         emulation_functions = []
         if self.search_emulation:
@@ -169,6 +182,7 @@ class Emulation():
             emulation_functions.append(self.scroll)
         return emulation_functions
 
+    # Function that performs all the actions added to the sequence
     def perform(self):
         funcs = self.emulation()
         try:
@@ -183,21 +197,20 @@ class Emulation():
 #__________________________________________________________________________________________
 # Main cycle that performs emulations for all urls and uploads new info
 class MainCycle():
-    def __init__(self, robot_id, cfg_link):
-        self.params, self.old_urls = get_params(f'url_{robot_id}.txt')
+    def __init__(self, robot_id):
+        self.params, self.old_urls = get_params(f'config_{robot_id}.txt')
         self.updated_params = self.params
         self.updated_urls = self.old_urls
         self.work_time = (self.params[0], self.params[1])
         self.percentage = self.params[2]
         self.repeatability = self.params[3]
         self.robot_id = self.params[8]
-        self.cfg_link = cfg_link
         self.reload_flag = False
 
     # creating urls array based on urls, percentage and repeatability parameters
     def new_urls(self):
         new_len_array = round(len(self.old_urls) * self.percentage / 100)
-        self.new_urls_array = self.old_urls[:new_len_array] * self.repeatability
+        self.new_urls_array = self.old_urls[:new_len_array] * (self.repeatability + 1)
         random.shuffle(self.new_urls_array)
         print(new_len_array)
         print(self.new_urls_array)
@@ -205,12 +218,17 @@ class MainCycle():
 
     # writing log for autostart in case of reboot
     def log(self):
-        log_string = f"{self.robot_id} - robot ID\n"
+        log_string = f"Robot ID {self.robot_id} - успешно запущен\n"
+        log_title = f'log_{self.robot_id}.txt'
+        gdrive_upload(log_title, log_string, log_folder)
         with open('log.txt', 'w') as file:
             file.write(log_string)
 
-    def delete_log(self):
+    def delete_used_files(self):
+        log_title = f'log_{self.robot_id}.txt'
+        gdrive_delete(log_title, log_folder)
         os.remove('log.txt')
+        os.remove(f'config_{self.robot_id}.txt')
 
     def go_to_sleep(self):
         current_hour, current_minute = map(int, datetime.today().strftime('%H %M').split())
@@ -223,8 +241,8 @@ class MainCycle():
                 rest_time = (self.work_time[0] - current_hour - 1) * 3600 + (60 - current_minute) * 60
                 print(f'Rest time is {rest_time}')
                 time.sleep(rest_time)
-            download_cfg(self.cfg_link)
-            self.updated_params, self.updated_urls = get_params(f'url_{self.robot_id}.txt')
+            gdrive_download(f'config_{self.robot_id}.txt')
+            self.updated_params, self.updated_urls = get_params(f'config_{self.robot_id}.txt')
             if self.updated_params != self.params or self.updated_urls != self.old_urls:
                 self.old_urls = self.updated_urls
                 self.params = self.updated_params
@@ -237,13 +255,14 @@ class MainCycle():
         self.log()
         urls = self.new_urls()
         for url in urls:
+            # function freezes program if working day ended and checks file changes after awake
             file_updated = self.go_to_sleep()
             if file_updated:
                 break
             emulation = Emulation(self.params, url)
             emulation.perform()
 
-        self.delete_log()
+        self.delete_used_files()
 
         if self.reload_flag:
             self.main()
@@ -251,6 +270,5 @@ class MainCycle():
 
 
 if __name__ == "__main__":
-    cfg_link = 'https://drive.google.com/file/d/1niPgvB3kVnAZxG1AlzeOQHZDJjI5Qdjp/view?usp=share_link'
-    main_cycle = MainCycle('111', cfg_link)
+    main_cycle = MainCycle('777')
     main_cycle.main()

@@ -1,6 +1,7 @@
 import gdown
 from PyQt5 import uic, QtWidgets
 from App_ import NotificationWindow
+from file_exchange import gdrive_upload
 
 Form, _ = uic.loadUiType("ConfigFile.ui")
 
@@ -14,7 +15,7 @@ class Ui(QtWidgets.QDialog, Form):
         self.pushButton_save.clicked.connect(self.save)
 
     def save(self):
-        error_flag = True
+        no_error_flag = True
         # Checking time range validity
         try:
             time_from, time_to = map(int,(self.textEdit_time_from.toPlainText(), self.textEdit_time_to.toPlainText()))
@@ -24,7 +25,7 @@ class Ui(QtWidgets.QDialog, Form):
         except:
             message_time = 'Проверьте правильность введенного диапазона времени'
             NotificationWindow(message_time)
-            error_flag = False
+            no_error_flag = False
 
         #Checking percentange validity
         try:
@@ -35,7 +36,7 @@ class Ui(QtWidgets.QDialog, Form):
         except:
             message_percentage = 'Проверьте правильность введенного количества обрабатываемых сайтов'
             NotificationWindow(message_percentage)
-            error_flag = False
+            no_error_flag = False
 
         # Checking repeatability validity
         try:
@@ -46,7 +47,7 @@ class Ui(QtWidgets.QDialog, Form):
         except:
             message_repeatability = 'Проверьте правильность введенного количества повторных посещений'
             NotificationWindow(message_repeatability)
-            error_flag = False
+            no_error_flag = False
 
         # Checking time on website validity
         try:
@@ -57,7 +58,7 @@ class Ui(QtWidgets.QDialog, Form):
         except:
             message_website_time = 'Проверьте правильность введенного времени нахождения на странице'
             NotificationWindow(message_website_time)
-            error_flag = False
+            no_error_flag = False
 
         # Checking transition amount validity
         try:
@@ -68,7 +69,7 @@ class Ui(QtWidgets.QDialog, Form):
         except:
             message_transition_amount = 'Проверьте правильность введенного количества переходов'
             NotificationWindow(message_transition_amount)
-            error_flag = False
+            no_error_flag = False
 
         # Checking robot id validity
         try:
@@ -76,17 +77,18 @@ class Ui(QtWidgets.QDialog, Form):
         except:
             message_repeatability = 'Проверьте правильность введенного ID робота. ID должно быть числом.'
             NotificationWindow(message_repeatability)
-            error_flag = False
+            no_error_flag = False
 
 
         # Creating file string
-        if error_flag:
-            file_str = f"{time_from} {time_to} {percentage} {repeatability} {time_on_website_from} {time_on_website_to} " \
+        if no_error_flag:
+            config_str = f"{time_from} {time_to} {percentage} {repeatability} {time_on_website_from} {time_on_website_to} " \
                f"{transition_amount_from} {transition_amount_to} {robot_id} {1 if self.checkBox_adv else 0} " \
                f"{1 if self.checkBox_search else 0}\n{self.textEdit_urls.toPlainText()}"
-            with open(f"url_{robot_id}.txt", "w") as file:
-                file.write(file_str)
-
+            # Downloading file on google drive
+            gdrive_upload(f'config_{robot_id}.txt', config_str)
+            message_success = 'Файл успешно загружен.'
+            NotificationWindow(message_success)
 
 if __name__ == "__main__":
     import sys

@@ -1,7 +1,7 @@
 import gdown
 from PyQt5 import uic, QtWidgets
 from newmain import MainCycle, download_cfg
-
+from file_exchange import gdrive_download
 
 Form, _ = uic.loadUiType("Interface.ui")
 
@@ -19,8 +19,8 @@ def create_preview(filename: str):
                     f"Время нахождения на странице от {params[4]} до {params[5]} минут\n" \
                     f"Количество страниц перехода от {params[6]} до {params[7]}\n" \
                     f"ID робота {params[8]}\n" \
-                    f"Переход по рекламным баннерам {params[9]}\n" \
-                    f"Эмуляция ссылок поисковиков {params[10]}\n" \
+                    f"Переход по рекламным баннерам {' - да' if params[9] == '1' else ' - нет'}\n" \
+                    f"Эмуляция ссылок поисковиков {' - да' if params[10] == '1' else ' - нет'}\n" \
                     f"\n" \
                     f"Ссылки:"
     file_array[0] = params_string
@@ -46,7 +46,7 @@ class Ui(QtWidgets.QDialog, Form):
         self.pushButton_load.clicked.connect(self.load_config)
         self.isfileFlag = False
         self.robot_id = ''
-        self.cfg_link = ''
+
 
         # Looking for a log file. If it exists - it means that something interrupted robot in previous session
         # and so now it can continue
@@ -56,14 +56,14 @@ class Ui(QtWidgets.QDialog, Form):
             pass
         else:
             with file:
-                self.robot_id = file.readline().split()[0]
+                self.robot_id = file.readline().split()[2]
             self.isfileFlag = True
             self.start()
 
     # pressing start button
     def start(self):
         if self.isfileFlag:
-            main_cycle = MainCycle(self.robot_id, self.cfg_link)
+            main_cycle = MainCycle(self.robot_id)
             main_cycle.main()
         else:
             err_text = 'Ошибка. Файл еще не был загружен.'
@@ -72,23 +72,23 @@ class Ui(QtWidgets.QDialog, Form):
     # pressing load button
     def load_config(self):
         self.listWidget.clear()
-        self.cfg_link = self.textEdit.toPlainText()
         self.robot_id = self.textEdit_id.toPlainText()
+        filename = f'config_{self.robot_id}.txt'
         try:
             # downloading config file
-            download_cfg(self.cfg_link)
-            self.isfileFlag = True
+            gdrive_download(filename)
             # showing config file in the left window
-            preview_array = create_preview(f"url_{self.robot_id}.txt")
+            preview_array = create_preview(filename)
             for line in preview_array:
                 item = QtWidgets.QListWidgetItem()
                 item.setText(line)
                 self.listWidget.addItem(item)
             self.setWindowTitle(f"Robot {self.robot_id}")
+            self.isfileFlag = True
             mess_text = 'Файл успешно загружен.'
             NotificationWindow(mess_text)
         except:
-            err_text = 'Ошибка. Проверьте введенную ссылку или ID робота.'
+            err_text = 'Ошибка. Файл не был создан либо введен неправильный ID.'
             NotificationWindow(err_text)
 
 if __name__ == "__main__":
